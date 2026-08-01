@@ -4,14 +4,23 @@ Guidance for Claude Code working in this repository.
 
 ## What this is
 
-The Bard extracted from [smol](https://github.com/jphein/smol): a ~260,000-parameter
-TinyStories-class transformer (int8, executed in place from flash) that generates
-endless stories on an ESP32-C3. Shipped inside smol as `--features bard`
-([smol#300](https://github.com/jphein/smol/issues/300)); moving out under
+The standalone Bard **device** project and its public face: a ~260,000-parameter
+TinyStories-class transformer (int8, executed in place from flash) generating endless
+stories on a microcontroller. Shipped inside [smol](https://github.com/jphein/smol) as
+`--features bard` ([smol#300](https://github.com/jphein/smol/issues/300)); given its own
+project and its own chip under
 [smol#347](https://github.com/jphein/smol/issues/347).
 
-**Today this repo contains the project, the docs, and the Pages site — no firmware.**
-That is deliberate, not an oversight.
+**This repo contains the project, the docs, and the Pages site. It does not contain
+firmware, and it is not going to.** That is the design, not a gap waiting to be filled.
+
+The Bard's source stays in smol. `bard` was dropped from smol's `REPRO_FLEET_FEATURES`
+(smol `a5b1312`) because on the ESP32-C3 the model's DRAM comes straight out of the
+runtime stack and starves the radio; the **feature itself stays**, and smol's
+`tools/gate.sh` builds a `bard` tier (smol `1efb8b5`) so it cannot rot. On an ESP32-S3 —
+the next fleet target — and on the C6, there is DRAM for both, and the Bard is just a
+smol feature switched on. The "Bard device" is a smol build with the right features on a
+chip with the right memory.
 
 ## Repository shape
 
@@ -31,10 +40,13 @@ genuinely necessary.
 
 ## Rules that are load-bearing here
 
-1. **Do not copy the firmware in before `smol-core` exists.** Phase 3 depends on Phase 2.
-   Copying `nano_llm.rs` plus a hand-copied `names.rs`/`sigil.rs` would make this the
-   *third* divergent copy of the shared layer — the esp32c6-watch is already the second,
-   and eliminating that duplication is the entire point of the extraction.
+1. **Never copy the firmware in — not now, not after `smol-core` lands.** This is the
+   rule most likely to be broken by someone being helpful: the repo is named after the
+   Bard, so importing `nano_llm.rs` looks like tidying up. It is not. It would create a
+   second copy of the model runtime and a *third* hand-copied `names.rs`/`sigil.rs` (the
+   esp32c6-watch is already the second), which is the divergence smol#347 exists to
+   eliminate. If a change belongs to the Bard's code, it belongs in smol behind
+   `--features bard`.
 
 2. **Never fabricate a story.** `stories/stories.json` holds text the model actually
    produced. Every entry carries `origin` (`device` or `reference`), the firmware
@@ -99,7 +111,9 @@ Two upstream constraints the collector must respect:
 
 ## Related
 
-- [smol](https://github.com/jphein/smol) — origin; the Bard still builds there behind
-  `--features bard`, and that flag stays
+- [smol](https://github.com/jphein/smol) — **where the firmware lives**, behind
+  `--features bard`. That flag stays, and `tools/gate.sh` builds a `bard` tier so it
+  keeps compiling while it waits for a chip with room
 - smol#347 — the extraction epic (phases, rationale)
+- smol#331 — multi-target (S3 / C6); the S3 is the likely host for the Bard device
 - smol#335 / #233 — the Embassy re-platform whose DRAM budget forced the split

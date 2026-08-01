@@ -303,6 +303,10 @@ footer a { color: var(--ink-soft); }
     <p>So the storyteller gets its own chip. It keeps a sigil name, keeps its place in
        the mesh roster, keeps reporting telemetry — but it stops competing with a radio
        for single kilobytes.</p>
+    <p>What it does <em>not</em> get is its own copy of the code. The Bard stays a smol
+       feature; only the shared C3 fleet image lost it. On an ESP32-S3 — the next fleet
+       target — there is memory for the radio and the model at once, and the Bard is
+       simply switched on. This site is the device's public face, not a fork.</p>
   </section>
 
   <hr class="rule">
@@ -312,7 +316,7 @@ footer a { color: var(--ink-soft); }
     <ul class="phases">
       <li><span class="n">I</span><span class="t">This repo, this page, versioning</span><span class="s" data-on>here</span></li>
       <li><span class="n">II</span><span class="t"><code>smol-core</code> — wire format, election, OTA relay, names, telemetry, shared by three consumers</span><span class="s">next</span></li>
-      <li><span class="n">III</span><span class="t">The Bard firmware on its own board, owning the whole chip</span><span class="s">after II</span></li>
+      <li><span class="n">III</span><span class="t">The Bard device — a smol build with <code>bard</code> on, most likely an S3, where radio and model both fit</span><span class="s">after II</span></li>
       <li><span class="n">IV</span><span class="t">Stories published over MQTT and rendered here, with node and version attached</span><span class="s">after III</span></li>
     </ul>
   </section>
