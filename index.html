@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Bard · a transformer telling stories on a $3 microcontroller</title>
+<meta name="description" content="A 260,000-parameter transformer writing endless stories on an ESP32-C3 with 400 KB of RAM.">
+<meta name="realm-version" content="dev">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<style>
+/* ── palette ─────────────────────────────────────────────────────────────
+   Light is parchment under a reading lamp. Dark is the same page by
+   candlelight. Both defined as custom properties so the toggle and the
+   media query set the same handful of names.                            */
+:root {
+  --bg:        #f4ece0;
+  --bg-veil:   #fbf6ee;
+  --bg-sunk:   #ece0cd;
+  --ink:       #2b2117;
+  --ink-soft:  #6b5946;
+  --rule:      #d8c7ae;
+  --ember:     #a8471b;
+  --gold:      #8a6a1f;
+  --violet:    #5c4a86;
+  --shadow:    0 1px 2px rgba(43,33,23,.07), 0 8px 28px rgba(43,33,23,.08);
+  --glow:      none;
+  --grain:     .035;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg:       #100d16;
+    --bg-veil:  #171320;
+    --bg-sunk:  #0a0810;
+    --ink:      #e9dcc4;
+    --ink-soft: #9d8f7c;
+    --rule:     #2e2740;
+    --ember:    #e39b4f;
+    --gold:     #d9b45f;
+    --violet:   #a58ee0;
+    --shadow:   0 1px 2px rgba(0,0,0,.5), 0 12px 40px rgba(0,0,0,.45);
+    --glow:     0 0 28px rgba(227,155,79,.13);
+    --grain:    .05;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg:       #100d16;
+  --bg-veil:  #171320;
+  --bg-sunk:  #0a0810;
+  --ink:      #e9dcc4;
+  --ink-soft: #9d8f7c;
+  --rule:     #2e2740;
+  --ember:    #e39b4f;
+  --gold:     #d9b45f;
+  --violet:   #a58ee0;
+  --shadow:   0 1px 2px rgba(0,0,0,.5), 0 12px 40px rgba(0,0,0,.45);
+  --glow:     0 0 28px rgba(227,155,79,.13);
+  --grain:    .05;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 17px/1.65 ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  overflow-x: hidden;
+}
+/* a faint tooth on the paper, drawn not fetched */
+body::before {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  opacity: var(--grain);
+  background-image:
+    radial-gradient(circle at 20% 30%, currentColor 0 1px, transparent 1px),
+    radial-gradient(circle at 70% 65%, currentColor 0 1px, transparent 1px);
+  background-size: 7px 7px, 11px 11px;
+}
+main, header, footer { position: relative; z-index: 1; }
+
+.wrap { width: min(72ch, calc(100% - 2.5rem)); margin-inline: auto; }
+
+/* ── masthead ─────────────────────────────────────────────────────────── */
+header { padding: clamp(3rem, 9vw, 6rem) 0 0; text-align: center; }
+.mark { font-size: 2.2rem; line-height: 1; color: var(--ember); text-shadow: var(--glow); }
+h1 {
+  font-size: clamp(2.4rem, 8vw, 4rem); line-height: 1.02;
+  margin: .45em 0 .1em; font-weight: 500; letter-spacing: -.02em;
+}
+h1 em { font-style: italic; color: var(--ember); text-shadow: var(--glow); }
+.dek { font-size: clamp(1.02rem, 2.6vw, 1.2rem); color: var(--ink-soft); margin: 0 auto; max-width: 44ch; }
+.rule {
+  border: 0; height: 1px; margin: 2.6rem 0;
+  background: linear-gradient(90deg, transparent, var(--rule) 18%, var(--rule) 82%, transparent);
+}
+.rule--glyph { position: relative; overflow: visible; }
+.rule--glyph::after {
+  content: "✦"; position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%); background: var(--bg);
+  padding: 0 .7rem; color: var(--gold); font-size: .85rem;
+}
+
+/* ── the story frame ──────────────────────────────────────────────────── */
+.tale {
+  background: var(--bg-veil);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  box-shadow: var(--shadow);
+  padding: clamp(1.4rem, 4vw, 2.4rem);
+  margin: 0 0 1.2rem;
+}
+.tale h2 { margin: 0 0 .1rem; font-size: 1.06rem; font-weight: 600; letter-spacing: .01em; }
+.tale .byline {
+  margin: 0 0 1.2rem; font-size: .8rem; color: var(--ink-soft);
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  letter-spacing: -.01em;
+}
+.tale .byline span::after { content: " · "; color: var(--rule); }
+.tale .byline span:last-child::after { content: ""; }
+.tale p { margin: 0; font-size: 1.09rem; }
+.caret {
+  display: inline-block; width: .55ch; height: 1.05em; margin-left: .08em;
+  background: var(--ember); vertical-align: -.16em; animation: blink 1.05s steps(1) infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+/* the OLED, actual proportions: 72×40 px, 5 lines × 14 chars */
+.glass {
+  margin: 1.6rem auto 0; width: max-content; max-width: 100%;
+  padding: .85rem 1rem; border-radius: 6px;
+  background: #07080a; border: 1px solid var(--rule);
+  box-shadow: inset 0 0 22px rgba(0,0,0,.85);
+}
+.glass pre {
+  margin: 0; font: 600 13px/1.42 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: #cfe6ff; text-shadow: 0 0 7px rgba(140,190,255,.5);
+  white-space: pre; letter-spacing: .04em;
+}
+.glass .cap {
+  margin-top: .55rem; font: 400 10px/1 ui-monospace, monospace;
+  color: #4b5566; letter-spacing: .07em; text-transform: uppercase;
+}
+
+.empty { color: var(--ink-soft); font-style: italic; }
+
+/* ── figures ──────────────────────────────────────────────────────────── */
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr)); gap: 1px;
+         background: var(--rule); border: 1px solid var(--rule); border-radius: 3px; overflow: hidden; }
+.stat { background: var(--bg-veil); padding: 1rem .9rem; }
+.stat b { display: block; font-size: clamp(1.25rem, 3.4vw, 1.6rem); font-weight: 600;
+          color: var(--ember); letter-spacing: -.02em; line-height: 1.1; }
+.stat span { display: block; margin-top: .25rem; font-size: .76rem; color: var(--ink-soft);
+             text-transform: uppercase; letter-spacing: .07em; }
+
+h2.sec { font-size: 1.5rem; font-weight: 500; margin: 0 0 .55rem; letter-spacing: -.01em; }
+h2.sec .num { color: var(--gold); font-size: .72em; margin-right: .5rem; font-variant-numeric: tabular-nums; }
+p { margin: 0 0 1rem; }
+a { color: var(--ember); text-decoration-thickness: 1px; text-underline-offset: .18em; }
+a:hover { color: var(--violet); }
+code { font: .88em/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+       background: var(--bg-sunk); padding: .1em .38em; border-radius: 3px; }
+
+.ledger { width: 100%; border-collapse: collapse; font-size: .93rem; margin: 0 0 1rem; }
+.ledger th, .ledger td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid var(--rule); }
+.ledger th { font-size: .74rem; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-soft); font-weight: 600; }
+.ledger td:last-child, .ledger th:last-child { text-align: right;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .88rem; }
+.ledger .up   { color: var(--ember); }
+.ledger .down { color: var(--violet); }
+.scroll-x { overflow-x: auto; }
+
+.phases { list-style: none; margin: 0; padding: 0; }
+.phases li { display: flex; gap: .9rem; padding: .7rem 0; border-bottom: 1px solid var(--rule); align-items: baseline; }
+.phases li:last-child { border-bottom: 0; }
+.phases .n { flex: 0 0 1.9rem; color: var(--gold);
+             font: 600 .82rem/1.6 ui-monospace, monospace; }
+.phases .t { flex: 1; }
+.phases .s { flex: 0 0 auto; font-size: .72rem; text-transform: uppercase; letter-spacing: .07em;
+             color: var(--ink-soft); border: 1px solid var(--rule); border-radius: 99px; padding: .12rem .55rem; }
+.phases .s[data-on] { color: var(--ember); border-color: var(--ember); }
+
+footer { margin: 4rem 0 3rem; font-size: .84rem; color: var(--ink-soft); text-align: center; }
+footer a { color: var(--ink-soft); }
+
+/* ── chrome: theme toggle + sigil ─────────────────────────────────────── */
+.toggle {
+  position: fixed; top: 1rem; right: 1rem; z-index: 5;
+  width: 2.3rem; height: 2.3rem; border-radius: 50%;
+  border: 1px solid var(--rule); background: var(--bg-veil); color: var(--ink-soft);
+  font-size: .95rem; cursor: pointer; display: grid; place-items: center;
+  box-shadow: var(--shadow);
+}
+.toggle:hover { color: var(--ember); border-color: var(--ember); }
+.sigil {
+  position: fixed; left: 1rem; bottom: 1rem; z-index: 5;
+  font: 400 .72rem/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--ink-soft); background: var(--bg-veil); border: 1px solid var(--rule);
+  border-radius: 99px; padding: .42rem .8rem; box-shadow: var(--shadow);
+  text-decoration: none; max-width: calc(100vw - 2rem); overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+.sigil b { color: var(--gold); font-weight: 400; }
+
+@media (prefers-reduced-motion: reduce) {
+  .caret { animation: none; }
+  * { transition: none !important; }
+}
+</style>
+</head>
+<body>
+
+<button class="toggle" id="toggle" type="button" aria-label="Switch between light and dark">◐</button>
+<a class="sigil" id="sigil" href="https://github.com/jphein/bard.realm.watch" rel="noopener"><b>✦</b> loading…</a>
+
+<header>
+  <div class="wrap">
+    <div class="mark">✦</div>
+    <h1>The <em>Bard</em></h1>
+    <p class="dek">A 260,000-parameter transformer writing stories on a $3 microcontroller — endlessly, on 400 KB of RAM.</p>
+  </div>
+</header>
+
+<main class="wrap">
+  <hr class="rule rule--glyph">
+
+  <section aria-labelledby="tale-h">
+    <h2 class="sec" id="tale-h"><span class="num">I</span>The tale so far</h2>
+    <p>Every word below came out of the 260,000-parameter model itself — no server-side
+       API, nothing written by a person. The tag on each tale says <em>where</em> it ran:
+       <code>device</code> for the chip in the field, <code>reference</code> for a
+       bit-identical run of the same weights on a host. Only the first kind is
+       interesting, and it is what phase IV exists to deliver.</p>
+
+    <div class="tale" id="tale">
+      <h2 id="tale-title">…</h2>
+      <p class="byline" id="tale-byline"></p>
+      <p id="tale-body" class="empty">Waiting for the bard to speak.</p>
+    </div>
+
+    <div class="glass">
+      <pre id="glass" aria-hidden="true"></pre>
+      <div class="cap">72 × 40 oled · 5 lines × 14 chars</div>
+    </div>
+  </section>
+
+  <hr class="rule">
+
+  <section aria-labelledby="how-h">
+    <h2 class="sec" id="how-h"><span class="num">II</span>How it holds a story that never ends</h2>
+    <p>The model's weights are int8 and executed in place from flash, so they never
+       occupy RAM. What does occupy RAM is the KV cache — and a fixed sliding window
+       of 80 tokens means it occupies exactly the same amount at the ten-thousandth
+       token as at the first.</p>
+    <p>The screen is not a viewport onto a finished text. There is no finished text.
+       Five lines of fourteen characters are all that exist at once, and the story
+       moves past them the way a river moves past a stone. That is what makes an
+       unbounded tale possible on a chip with less memory than a single JPEG.</p>
+
+    <div class="stats">
+      <div class="stat"><b>260K</b><span>parameters</span></div>
+      <div class="stat"><b>202 ms</b><span>per token</span></div>
+      <div class="stat"><b>80</b><span>token window</span></div>
+      <div class="stat"><b>~281 KB</b><span>model in flash</span></div>
+      <div class="stat"><b>55,440 B</b><span>stack high-water</span></div>
+      <div class="stat"><b>bit-exact</b><span>vs python reference</span></div>
+    </div>
+    <p style="margin-top:1rem;font-size:.93rem;color:var(--ink-soft)">
+      The high-water figure was byte-identical across five consecutive reports spanning
+      many tale boundaries. The window does not creep — which is the difference between
+      a demo and a thing that runs until you unplug it.</p>
+  </section>
+
+  <hr class="rule">
+
+  <section aria-labelledby="why-h">
+    <h2 class="sec" id="why-h"><span class="num">III</span>Why it left the mesh firmware</h2>
+    <p>The Bard was built inside <a href="https://github.com/jphein/smol">smol</a>, a
+       mesh firmware for a fleet of dollar microcontrollers, and shipped there. Living
+       in the same binary as the radio stack, it costs:</p>
+
+    <div class="scroll-x">
+    <table class="ledger">
+      <thead><tr><th>Section</th><th>What it is</th><th>Cost</th></tr></thead>
+      <tbody>
+        <tr><td><code>.rodata</code></td><td>the model blob, XIP from flash</td><td class="up">+287,392 B</td></tr>
+        <tr><td><code>.bss</code> + <code>.data</code></td><td>working DRAM</td><td class="up">+39,072 B</td></tr>
+        <tr><td><code>.stack</code></td><td>the DRAM that was left over</td><td class="down">−39,072 B</td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <p>The third row is not a separate cost — it <em>is</em> the second row. On this
+       chip the linker hands the runtime stack whatever DRAM remains after everything
+       else, and it shrinks that region silently rather than failing the build. A
+       binary that links is not therefore a binary that runs.</p>
+    <p>On the current fleet image both fit. On the async re-platform, where the radio
+       stack is materially larger, they do not: the shared image links with a
+       <strong>67,488 B</strong> stack against a <strong>74,208 B</strong> floor. The
+       same commit without the Bard links with <strong>106,560 B</strong> — a 32 KB
+       margin in place of a 6.7 KB deficit.</p>
+    <p>So the storyteller gets its own chip. It keeps a sigil name, keeps its place in
+       the mesh roster, keeps reporting telemetry — but it stops competing with a radio
+       for single kilobytes.</p>
+  </section>
+
+  <hr class="rule">
+
+  <section aria-labelledby="road-h">
+    <h2 class="sec" id="road-h"><span class="num">IV</span>Where this is going</h2>
+    <ul class="phases">
+      <li><span class="n">I</span><span class="t">This repo, this page, versioning</span><span class="s" data-on>here</span></li>
+      <li><span class="n">II</span><span class="t"><code>smol-core</code> — wire format, election, OTA relay, names, telemetry, shared by three consumers</span><span class="s">next</span></li>
+      <li><span class="n">III</span><span class="t">The Bard firmware on its own board, owning the whole chip</span><span class="s">after II</span></li>
+      <li><span class="n">IV</span><span class="t">Stories published over MQTT and rendered here, with node and version attached</span><span class="s">after III</span></li>
+    </ul>
+  </section>
+</main>
+
+<footer class="wrap">
+  <p>Extracted from <a href="https://github.com/jphein/smol">smol</a> · GPL-3.0 ·
+     <a href="https://github.com/jphein/bard.realm.watch">source</a></p>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  // ── theme ──────────────────────────────────────────────────────────────
+  var root = document.documentElement, KEY = "bard-theme";
+  try {
+    var saved = localStorage.getItem(KEY);
+    if (saved === "dark" || saved === "light") root.setAttribute("data-theme", saved);
+  } catch (e) { /* private mode: fall back to prefers-color-scheme */ }
+
+  document.getElementById("toggle").addEventListener("click", function () {
+    var dark = matchMedia("(prefers-color-scheme: dark)").matches;
+    var cur  = root.getAttribute("data-theme");
+    if (cur !== "dark" && cur !== "light") cur = dark ? "dark" : "light";
+    var next = cur === "dark" ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    try { localStorage.setItem(KEY, next); } catch (e) {}
+  });
+
+  // ── sigil ──────────────────────────────────────────────────────────────
+  fetch("version.json", { cache: "no-store" })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (v) {
+      if (!v) throw 0;
+      var el = document.getElementById("sigil");
+      el.innerHTML = "<b>✦</b> ";
+      el.appendChild(document.createTextNode(v.version || v.name || "dev"));
+      if (v.commit_url) el.href = v.commit_url;
+    })
+    .catch(function () { document.getElementById("sigil").innerHTML = "<b>✦</b> dev"; });
+
+  // ── the story ──────────────────────────────────────────────────────────
+  var COLS = 14, ROWS = 5;
+  var glass = document.getElementById("glass");
+  var body  = document.getElementById("tale-body");
+  var slow  = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function blank() {
+    return new Array(ROWS).fill("".padEnd(COLS, " ")).join("\n");
+  }
+  glass.textContent = blank();
+
+  // Wrap to 14 columns the way the firmware does, then show only the last 5
+  // lines — the screen is a window the story moves past, not a scrollback.
+  function window5(text) {
+    var words = text.split(/\s+/), lines = [""], i;
+    for (i = 0; i < words.length; i++) {
+      var w = words[i];
+      if (!lines[lines.length - 1]) { lines[lines.length - 1] = w.slice(0, COLS); continue; }
+      if (lines[lines.length - 1].length + 1 + w.length <= COLS) lines[lines.length - 1] += " " + w;
+      else lines.push(w.slice(0, COLS));
+    }
+    var tail = lines.slice(-ROWS);
+    while (tail.length < ROWS) tail.push("");
+    return tail.map(function (l) { return l.padEnd(COLS, " "); }).join("\n");
+  }
+
+  function tell(story) {
+    document.getElementById("tale-title").textContent = story.title || "Untitled";
+    var by = document.getElementById("tale-byline"), bits = [];
+    bits.push(story.origin === "device" ? "on device" : "reference run");
+    if (story.node)    bits.push(story.node);
+    if (story.version) bits.push(story.version);
+    if (story.ms_per_token) bits.push(story.ms_per_token + " ms/tok");
+    if (story.generated) bits.push(story.generated);
+    by.innerHTML = "";
+    bits.forEach(function (b) {
+      var s = document.createElement("span"); s.textContent = b; by.appendChild(s);
+    });
+
+    var text = String(story.text || "");
+    body.classList.remove("empty");
+
+    if (slow) { body.textContent = text; glass.textContent = window5(text); return; }
+
+    // typewriter, at roughly the pace the OLED actually delivers characters
+    body.textContent = "";
+    var caret = document.createElement("i");
+    caret.className = "caret";
+    body.appendChild(caret);
+    var i = 0;
+    (function step() {
+      if (i >= text.length) { caret.remove(); return; }
+      i += 1;
+      caret.remove();
+      body.textContent = text.slice(0, i);
+      body.appendChild(caret);
+      glass.textContent = window5(text.slice(0, i));
+      setTimeout(step, 34);
+    })();
+  }
+
+  fetch("stories/stories.json", { cache: "no-store" })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (d) {
+      var list = d && d.stories;
+      if (!list || !list.length) throw 0;
+      tell(list[0]);
+    })
+    .catch(function () {
+      document.getElementById("tale-title").textContent = "No tale yet";
+      body.textContent =
+        "The bard has not spoken here yet. Stories arrive once the firmware " +
+        "ships and starts publishing over MQTT — see phase IV below.";
+    });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+{
+  "$comment": "Stories the Bard produced. Newest first — index.html renders stories[0]. Nothing here is written by a person; if a field cannot be filled honestly, leave it out rather than guessing. See ../README.md for how device stories will reach this file.",
+  "schema": {
+    "title": "string — the tale's opening phrase, for the page heading",
+    "text": "string — the generated text, verbatim, no editing",
+    "origin": "\"device\" (a chip in the field) | \"reference\" (the same weights on a host)",
+    "node": "string — sigil node name, device origin only",
+    "version": "string — firmware version that produced it",
+    "ms_per_token": "number — measured, not nominal",
+    "temp": "number — 0 is deterministic greedy decode",
+    "generated": "string — ISO-8601 date",
+    "provenance": "string — how this text is known to be genuine"
+  },
+  "stories": [
+    {
+      "title": "The girl and the red ball",
+      "text": "Once upon a time, there was a little girl named Lily. She loved to play outside in the park. One day, she saw a big, red ball. She wanted to play with it, but it was too high",
+      "origin": "reference",
+      "version": "smol#300",
+      "temp": 0,
+      "generated": "2026-07-26",
+      "provenance": "Greedy decode from BOS at temperature 0 — the model's deterministic opening, so the same weights emit this same text every time. Recorded during the smol#300 port and verified bit-for-bit against an independent Python reference implementation. Not an on-device capture: it is what the device says, established on a host. The first true device capture replaces it."
+    }
+  ]
+}
