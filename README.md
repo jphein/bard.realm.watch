@@ -147,4 +147,4 @@ memory cost of the first.
 
 ## License
 
-GPL-3.0. Same as smol, from which this was extracted.
+AGPL-3.0-or-later © 2026 Jeffrey Pine Hein. See [LICENSE](LICENSE).
